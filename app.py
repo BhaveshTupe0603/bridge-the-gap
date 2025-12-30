@@ -1,26 +1,34 @@
 import streamlit as st
 import google.generativeai as genai
-import os
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Bridge-The-Gap", page_icon="🎓")
+st.set_page_config(page_title="Bridge-The-Gap", page_icon="🎓", layout="centered")
 
 # --- API KEY SETUP ---
-# Priority: 1. Streamlit Secrets, 2. Manual Variable, 3. User Input
-GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY") 
+# It will look in st.secrets first. 
+# If not there, it checks the variable. 
+# If still not there, it shows a sidebar input.
+api_key_from_secrets = st.secrets.get("GOOGLE_API_KEY")
 
-# TESTING PURPOSES: If you want to hardcode for a quick test, paste it here:
-# GOOGLE_API_KEY = "YOUR_ACTUAL_API_KEY_HERE"
+# TESTING ONLY: Paste your key here if you aren't using secrets.toml yet:
+# api_key_from_secrets = "AIzaSy..." 
 
-if not GOOGLE_API_KEY:
-    st.sidebar.warning("API Key not found in secrets.")
+if api_key_from_secrets:
+    GOOGLE_API_KEY = api_key_from_secrets
+else:
+    st.sidebar.warning("API Key not found in Secrets.")
     GOOGLE_API_KEY = st.sidebar.text_input("Enter Google API Key:", type="password")
 
 if GOOGLE_API_KEY:
-    genai.configure(api_key=GOOGLE_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    try:
+        genai.configure(api_key=GOOGLE_API_KEY)
+        # Using the specific 2.5-flash model from your available list
+        model = genai.GenerativeModel('gemini-2.5-flash')
+    except Exception as e:
+        st.error(f"Configuration Error: {e}")
+        st.stop()
 else:
-    st.error("Please provide a Google API Key to continue.")
+    st.info("👋 Please enter your Google API Key to begin.")
     st.stop()
 
 # --- UI DESIGN ---
@@ -28,54 +36,45 @@ st.title("🌉 Bridge-The-Gap")
 st.subheader("Find Your Missing Knowledge")
 st.markdown("""
     Struggling with a complex topic? Paste it below, and we'll identify the 
-    **3 fundamental concepts** you need to master first to understand it.
+    **3 fundamental concepts** you need to master first.
 """)
 
-# Input section
-target_topic = st.text_input("What topic is confusing you?", placeholder="e.g. Eigenvalues, Quantum Entanglement, Backpropagation")
+# Text Input
+target_topic = st.text_input("What topic is confusing you?", placeholder="e.g., Eigenvalues, Backpropagation, CRISPR")
 
-analyze_button = st.button("Analyze Prerequisites")
-
-# --- LOGIC ---
-if analyze_button:
+# Analyze Button
+if st.button("Analyze Prerequisites"):
     if target_topic:
-        with st.spinner(f"Analyzing the foundations of {target_topic}..."):
-            # The Prompt
+        with st.spinner(f"Using Gemini 2.5 to analyze '{target_topic}'..."):
+            # Refined Prompt for Gemini 2.5
             prompt = f"""
-            You are an expert tutor helping a student who is stuck. 
-            The student wants to learn about: "{target_topic}".
+            Identify the top 3 most important prerequisite concepts needed BEFORE learning "{target_topic}".
             
-            Identify the top 3 most important prerequisite concepts they need to understand BEFORE learning "{target_topic}".
-            For each prerequisite:
-            1. Provide the name of the concept.
-            2. Provide a simple, 1-sentence definition.
+            For each concept, provide:
+            1. The Concept Name (as a heading).
+            2. A simple, 1-sentence definition for a beginner.
             
-            Format the output exactly like this:
-            ### 1. [Concept Name]
-            [1-sentence definition]
-            
-            ### 2. [Concept Name]
-            [1-sentence definition]
-            
-            ### 3. [Concept Name]
-            [1-sentence definition]
+            Format the response clearly using Markdown.
             """
-
+            
             try:
+                # API Call
                 response = model.generate_content(prompt)
                 
-                # UI Display of results
+                # Display Results
                 st.divider()
-                st.success(f"To understand **{target_topic}**, you should first master these:")
+                st.success(f"To understand **{target_topic}**, master these first:")
                 st.markdown(response.text)
                 
-                st.info("💡 **Tip:** Master these in order, and the main topic will become much clearer!")
-
+                st.info("💡 **Hackathon Tip:** Master these foundations first to make the complex topic easy!")
+                
             except Exception as e:
+                # If 2.5-flash is still acting up, this will tell us exactly why
                 st.error(f"An error occurred: {e}")
+                st.info("Note: Ensure your API Key has 'Generative AI Training' or 'Pay-as-you-go' enabled if required for 2.5 models.")
     else:
         st.warning("Please enter a topic first!")
 
 # --- FOOTER ---
 st.markdown("---")
-st.caption("Built for Hackathon Prototype: Bridge-The-Gap")
+st.caption("Bridge-The-Gap Prototype | Powered by Gemini 2.5 Flash")
